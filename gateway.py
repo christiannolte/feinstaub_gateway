@@ -4,12 +4,17 @@ import json
 import paho.mqtt.client as mqtt
 import os
 
+
+print("Welcome to Airrohrgateway")
+
 broker = "broker.emqx.io"
 port = 1883
 topic = os.getenv("topic")
 
 # Beispiel-URL einer öffentlichen API
 url = os.getenv("url")
+print ("Will read values from: " +url)
+print ("Will write data to topic: "+topic)
 
 mydata= {
  "pm25":9999,
@@ -20,18 +25,11 @@ mydata= {
 }
 
 def lese_und_sende():
-  # MQTT-Client erstellen
   client = mqtt.Client()
-  
-  # Verbindung herstellen
   client.connect(broker, port)
-  
-    
   while(1):
-
     # Anfrage an die API senden
     response = requests.get(url)
-
     # Prüfen, ob die Anfrage erfolgreich war
     if response.status_code == 200:
         # JSON-Daten extrahieren
@@ -45,7 +43,6 @@ def lese_und_sende():
                 mydata["pres"]=int(float(value[u'value'])/100.0)
             if value[u'value_type']==u'signal':
                 mydata["rssi"]=value[u'value']
-
         mydata["age"]=data["age"]
         json_string = json.dumps(mydata)
         print(json_string)
