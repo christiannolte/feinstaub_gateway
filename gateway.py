@@ -56,9 +56,4 @@ def lese_und_sende():
 print("Topic: "+topic)
 print("URL: "+url)
 
-while(1):
-  try:
-    lese_und_sende()
-  except:
-    print("Da ist was schiefgegangen")
-    time.sleep(60)
+lese_und_sende()
