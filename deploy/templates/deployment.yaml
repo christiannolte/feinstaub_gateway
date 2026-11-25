@@ -27,3 +27,14 @@ spec:
               value: {{ .Values.url }}
             - name: topic
               value: {{ .Values.topic }}
+          # Neustart, wenn laenger als 180s nichts erfolgreich gelesen und gesendet wurde
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os, sys, time; sys.exit(time.time() - os.path.getmtime('/tmp/heartbeat') > 180)"
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 2

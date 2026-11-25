@@ -3,6 +3,8 @@ import requests
 import json
 import paho.mqtt.client as mqtt
 import os
+import sys
+from pathlib import Path
 
 
 print("Welcome to Airrohrgateway")
@@ -18,6 +20,13 @@ print ("Will write data to topic: "+topic)
 
 MAX_WARTEZEIT = 20
 MIN_WARTEZEIT = 1
+HTTP_TIMEOUT = 10
+MQTT_TIMEOUT = 10
+# Nach so vielen Sekunden ohne erfolgreiches Lesen und Senden beendet sich das
+# Skript, damit Kubernetes den Container neu startet
+MAX_OHNE_ERFOLG = 120
+# Wird nach jedem Erfolg aktualisiert und von der Liveness-Probe geprueft
+HEARTBEAT_DATEI = Path("/tmp/heartbeat")
 
 mydata= {
  "pm25":9999,
@@ -30,12 +39,15 @@ mydata= {
 def lese_und_sende():
   client = mqtt.Client()
   client.connect(broker, port)
+  # Netzwerkschleife im Hintergrund: Keepalive, Bestaetigungen, Reconnect
+  client.loop_start()
+  letzter_erfolg = time.monotonic()
   while(1):
     wartezeit = MAX_WARTEZEIT
-    # Anfrage an die API senden
-    response = requests.get(url)
-    # Prüfen, ob die Anfrage erfolgreich war
-    if response.status_code == 200:
+    try:
+        # Anfrage an die API senden
+        response = requests.get(url, timeout=HTTP_TIMEOUT)
+        response.raise_for_status()
         # JSON-Daten extrahieren
         data=json.loads(response.text)
         interval_s=None
@@ -57,10 +69,18 @@ def lese_und_sende():
             wartezeit = min(MAX_WARTEZEIT, max(MIN_WARTEZEIT, interval_s + 1 - float(data["age"])))
         json_string = json.dumps(mydata)
         print(json_string)
-        # Nachricht veroeffentlichen
-        client.publish(topic, json_string)
-    else:
-        print(f"Fehler bei der Anfrage: {response.status_code}")
+        # Nachricht veroeffentlichen und auf die Bestaetigung des Brokers warten (QoS 1)
+        info = client.publish(topic, json_string, qos=1)
+        info.wait_for_publish(MQTT_TIMEOUT)
+        if not info.is_published():
+            raise RuntimeError("Keine Bestaetigung vom Broker")
+        letzter_erfolg = time.monotonic()
+        HEARTBEAT_DATEI.touch()
+    except Exception as e:
+        print(f"Fehler: {e}")
+        if time.monotonic() - letzter_erfolg > MAX_OHNE_ERFOLG:
+            print(f"Seit {MAX_OHNE_ERFOLG}s kein Erfolg, beende fuer Neustart")
+            sys.exit(1)
     time.sleep(wartezeit)
 
 
