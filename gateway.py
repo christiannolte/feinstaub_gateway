@@ -37,7 +37,7 @@ mydata= {
 }
 
 def lese_und_sende():
-  client = mqtt.Client()
+  client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
   client.connect(broker, port)
   # Netzwerkschleife im Hintergrund: Keepalive, Bestaetigungen, Reconnect
   client.loop_start()
