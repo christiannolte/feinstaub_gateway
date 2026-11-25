@@ -27,6 +27,12 @@ spec:
               value: {{ .Values.url }}
             - name: topic
               value: {{ .Values.topic }}
+          # Wartet auf den ersten erfolgreichen Durchlauf (hoechstens 180s)
+          startupProbe:
+            exec:
+              command: ["test", "-f", "/tmp/heartbeat"]
+            periodSeconds: 5
+            failureThreshold: 36
           # Neustart, wenn laenger als 180s nichts erfolgreich gelesen und gesendet wurde
           livenessProbe:
             exec:
@@ -34,7 +40,6 @@ spec:
                 - python
                 - -c
                 - "import os, sys, time; sys.exit(time.time() - os.path.getmtime('/tmp/heartbeat') > 180)"
-            initialDelaySeconds: 180
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 2
